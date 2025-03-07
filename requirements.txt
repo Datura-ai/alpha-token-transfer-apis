@@ -1,0 +1,13 @@
+fastapi
+pydantic
+uvicorn
+PyJWT
+slowapi
+python-multipart
+loguru
+pydantic_settings
+cryptography
+pydantic_settings
+pytest-asyncio
+httpx
+anyio[trio]
