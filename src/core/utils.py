@@ -1,5 +1,6 @@
 from async_substrate_interface.sync_substrate import SubstrateInterface
 from bittensor_wallet.keypair import Keypair
+from bt_decode import StakeInfo
 from core.coingecko_client import coingecko_client
 from core.config import setting
 from loguru import logger
@@ -44,7 +45,7 @@ def print_extrinsic_receipt(receipt):
     batch_interrupted_event = None
     error_message = None
     for event in receipt.triggered_events:
-        event_details = event.value['event']
+        event_details = event['event']
         module_id = event_details['module_id']
         event_id = event_details['event_id']
 
@@ -70,13 +71,23 @@ def print_extrinsic_receipt(receipt):
         if receipt.error_message:
             print(f"Error message: {receipt.error_message}")
 
-def batch_transfer_balances(substrate: SubstrateInterface, kaypair, transfer_info_dict: dict):
+def batch_transfer_balances(substrate: SubstrateInterface, keypair, transfer_info_dict: dict):
+    """
+    Batch transfer balances from keypair to multiple destination coldkeys
 
+    :param substrate: The substrate client
+    :param keypair: The keypair to transfer the balance from
+    :param transfer_info_dict: A dictionary of destination coldkeys and amounts in USD to transfer
+
+    :return: A tuple of the amount in USD transferred and the amount in TAO
+    """
+    logger.info(f"Syncing with chain: {setting.subtensor}...")
     all_calls = []
-    for dest_coldkey, amount_in_usd in transfer_info_dict:
+    for dest_coldkey, amount_in_usd in transfer_info_dict.items():
         
         amount_in_tao, rate = coingecko_client.convert_to_tao(amount_in_usd)
         amount_in_alpha = int(convert_to_alpha(substrate, amount_in_tao) * pow(10, 9))
+        logger.info(f"Sending {amount_in_tao} TAO ({rate} USD) ({amount_in_alpha} ALPHA) for {amount_in_usd} USD to {dest_coldkey}...")
         
         call = substrate.compose_call(
             call_module="SubtensorModule",
@@ -92,7 +103,7 @@ def batch_transfer_balances(substrate: SubstrateInterface, kaypair, transfer_inf
 
         all_calls.append(call)
 
-    batch_call = node.compose_call(
+    batch_call = substrate.compose_call(
         call_module="Utility",
         call_function="force_batch",
         call_params={'calls': all_calls}
@@ -102,7 +113,8 @@ def batch_transfer_balances(substrate: SubstrateInterface, kaypair, transfer_inf
     wait_for_inclusion = True
     response = substrate.submit_extrinsic(extrinsic, wait_for_inclusion=wait_for_inclusion, wait_for_finalization=False)
     if wait_for_inclusion:
-        print_extrinsic_receipt(response)   
+        print_extrinsic_receipt(response)
+
     return None, None
 
 def transfer_balance(substrate: SubstrateInterface, keypair, dest_coldkey: str, amount_in_usd: float):

@@ -53,5 +53,5 @@ python3 app.py
 
 You can test transfer using CLI: 
 ```bash
-python3 cli.py transfer-balance --amount_in_usd=10 --miner_coldkey=<miner-coldkey> 
+python3 cli.py transfer-balance --coldkeys=5CqvqYU8DSCQRd8j8GxGpWrYFWihraXvxjXjsAaU2AF9hs59,5HQtHtkorV8yrPzvUgPomHvcZuFoscvD1Js7vTaJanB4ZKme --amount_in_usd=10
 ```

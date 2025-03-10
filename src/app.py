@@ -19,7 +19,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from core.config import setting
-from core.utils import get_substrate, transfer_balance
+from core.utils import batch_transfer_balances, get_substrate, transfer_balance
 from schema import TransferRequest, TransferResponse
 
 # Create a semaphore with a value of 1 (only one request at a time)
@@ -151,7 +151,7 @@ async def process_transfer(
     """Process a money transfer between accounts"""
     # Get request ID from middleware
     request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
-    logger.info(f"Processing transfer: {request_id}, Billing History ID: {transfer.billing_history_id}")
+    logger.info(f"Processing transfer: {request_id}, Transaction ID: {transfer.transaction_id}")
 
     # Load the keypair.
     try:
@@ -164,19 +164,24 @@ async def process_transfer(
     while True:
         try:
             substrate = await get_substrate()
-            transfer_balance(substrate, keypair, transfer.miner_coldkey, transfer.amount_in_usd)
+            batch_transfer_balances(substrate, keypair, transfer.transfers_dict)
             break
         except async_substrate_interface.errors.SubstrateRequestException as exc:
             logger.error(f"Substrate request exception: {exc}")
             if "Invalid Transaction" in str(exc):
                 return TransferResponse(
-                    billing_history_id=transfer.billing_history_id,
+                    transaction_id=transfer.transaction_id,
                     status="error",
                     message="Invalid transaction"
                 )
         except Exception as exc:
             logger.error(
                 f"Unhandled exception performing transfer operation: {exc}\n{traceback.format_exc()}"
+            )
+            return TransferResponse(
+                transaction_id=transfer.transaction_id,
+                status="error",
+                message="Unhandled exception"
             )
             
         await asyncio.sleep(5)
@@ -187,13 +192,13 @@ async def process_transfer(
                 "Giving up transfer, max consecutive failures reached {keypair.ss58_address=}"
             )
             return TransferResponse(
-                billing_history_id=transfer.billing_history_id,
+                transaction_id=transfer.transaction_id,
                 status="error",
                 message="Max consecutive failures reached"
             )
         
     return TransferResponse(
-        billing_history_id=transfer.billing_history_id,
+        transaction_id=transfer.transaction_id,
         status="success",
         message="Transfer processed successfully"
     )

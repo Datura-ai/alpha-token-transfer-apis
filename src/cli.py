@@ -55,20 +55,22 @@ def generate_cipher_text(mnemonic: str, password: str):
     return cipher_text
 
 @cli.command()
+@click.option('--coldkeys', type=str, prompt="Coldkeys", help='Coldkeys')
 @click.option('--amount_in_usd', type=float, prompt="Amount in USD", help='Amount in USD')
-@click.option('--miner_coldkey', type=str, prompt="Miner coldkey", help='Miner coldkey')
-def transfer_balance(amount_in_usd: float, miner_coldkey: str):
+def transfer_balance(coldkeys: str, amount_in_usd: float):
     """Transfer balance from the hotkey to the miner coldkey."""
     server_url = "http://localhost:8000"
     response = requests.post(
         f"{server_url}/api/v1/transfers",
         json={
-            "amount_in_usd": amount_in_usd,
-            "miner_coldkey": miner_coldkey,
-            "billing_history_id": "123",
+            "transfers_dict": {
+                coldkey: amount_in_usd for coldkey in coldkeys.split(',')
+            },
+            "transaction_id": str(uuid.uuid4()),
         },
         headers={"Authorization": f"Bearer {create_jwt_token()}"},
     )
     print(response.json())
+
 if __name__ == "__main__":
     cli()
